@@ -1,0 +1,113 @@
+---
+title: "Thesis project - SARS-CoV-2 UN_48H"
+output: html_notebook
+---
+
+### Clean environment
+```{r}
+rm(list=ls())
+
+```
+### Libraries
+```{r}
+library("xlsx")
+```
+### set directory
+```{r setup}
+knitr::opts_knit$set(root.dir = normalizePath("C:\\Users\\beasav\\OneDrive - KI.SE\\Bioinformatics\\1. Our data\\SARS-CoV-2")) 
+```
+
+### Load data
+SARS-CoV-2 UN_48
+```{r}
+raw_data <- read.xlsx("covid-19_proteomics_UNINF_vs_H48PI_DGE_results.xlsx",1)
+
+```
+
+#Check for missing values in our data
+
+How to do this????
+The file does not show any NA value
+```{r}
+
+```
+
+#Filter for significant changes
+p<0.05
+
+```{r}
+sig_NA.<- c() #vector to store IDs of dif_regulated genes
+sig_Accession <- c() #vector to store Accession numbers of dif_regulated genes
+sig_Gene_name <- c() #vector to store IDs of dif_regulated genes
+sig_logFC <- c() #vector to store IDs of dif_regulated genes
+sig_AveExp <- c() #vector to store IDs of dif_regulated genes
+sig_t <- c() #vector to store IDs of dif_regulated genes
+sig_P.Value <- c() #vector to store P.value of dif_regulated genes
+sig_adj.P.Val <- c() #vector to store P.value of dif_regulated genes
+sig_B <- c() #vector to store B of dif_regulated genes
+
+for (i in seq(raw_data$NA.)) {
+  #print(i)
+    if(raw_data$adj.P.Val[i]<0.05){ #Criteria for differentially expressed genes
+      sig_NA. <- c(sig_NA., raw_data$NA.[i])
+      sig_Accession <- c(sig_Accession, raw_data$Accession[i])
+      sig_Gene_name <- c(sig_Gene_name, raw_data$Gene_name[i])
+      sig_sig_logFC <- c(sig_logFC, raw_data$logFC[i])
+      sig_AveExp <- c(sig_AveExp, raw_data$AveExp[i])
+      sig_t <- c(sig_t, raw_data$t[i])
+      sig_P.Value <- c(sig_P.Value, raw_data$P.Value[i])
+      sig_adj.P.Val <- c(sig_adj.P.Val, raw_data$adj.P.Val[i])
+      sig_B <- c(sig_B, raw_data$B[i])
+    }
+}
+```
+
+### Save filtered results in a file
+
+```{r}
+data <- data.frame(sig_NA., sig_Accession, sig_Gene_name, sig_logFC, sig_AveExp, sig_t, sig_P.Value, sig_adj.P.Val, sig_B)
+
+write.xlsx(data,
+           file =  "CoV2_UN_48_filtered.xlsx",
+           sheetName = "CoV2_UN_48_filtered",
+           col.names = TRUE, row.names = FALSE, append = FALSE)
+
+
+```
+
+### File with dif_expressed for Enrichr
+There's one "Uncharacterized protein" - A0A1W2PPE3 https://www.uniprot.org/uniprot/A0A1W2PPE3.
+Since there is no information about the gene it corresponds to, it is not included for Gene Enrichment Analysis
+
+```{r}
+write(Gene_name, "dif_expressed genes.txt")
+
+```
+### Inport Enrichr results
+
+
+https://maayanlab.cloud/Enrichr/enrich?dataset=30e6c406dae9ea6ae51025eb9d2cd92b
+
+Library: BioPlanet 2019
+
+"The p-value is computed from the Fisher exact test which is a proportion test that assumes a binomial distribution and independence for probability of any gene belonging to any set."
+*The smaller the p-value, the higher the chance that the genes belong to that pathway, right?*
+
+```{r}
+
+```
+
+- put on git hub
+- do vulcano plot
+
+
+#Build a heatmap from our data
+BiocManager::install("ComplexHeatmap")
+
+
+```{r}
+
+
+```
+
+
