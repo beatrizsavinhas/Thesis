@@ -10,7 +10,8 @@ rm(list=ls())
 ```
 ### Libraries
 ```{r}
-library("xlsx")
+library("xlsx") #Read/Write excel files
+library(ggrepel) #plots
 ```
 ### set directory
 ```{r setup}
@@ -24,18 +25,89 @@ raw_data <- read.xlsx("covid-19_proteomics_UNINF_vs_H48PI_DGE_results.xlsx",1)
 
 ```
 
-#Check for missing values in our data
+### Check for missing values in our data
 
 How to do this????
 The file does not show any NA value
+
+### Build PCA plot
+
+https://www.nonlinear.com/progenesis/qi-for-proteomics/v4.2/faq/pca.aspx
+
+
+Flora's code: https://github.com/neogilab/COVID_IFN/blob/main/Proteomics_MERS_v1.Rmd
+
+
+
+Does not make sense for only significant values.
 ```{r}
+
+
+pca_data <- data.frame(group = condition, t(as.matrix(data_norm)))
 
 ```
 
-#Filter for significant changes
-p<0.05
+## Building Vulcano plot
+### Filter significantly regulted genes
 
 ```{r}
+data <- raw_data
+
+data$color <- NA #create a Color column
+
+for (i in 1:nrow(data)){
+  if(data[i, 4] > 0.3 & data[i, 8] < 0.05){
+    data[i, 10] <- "up_regulated"
+  }
+  else if(data[i, 4] < -0.3 & data[i, 8] < 0.05){
+    data[i, 10] <- "down_regulated"
+  }
+  else if(data[i, 8] > 0.05){
+    data[i, 10] <- "NS" #Non significant
+    data[i, 3] <- NA #Delete gene name for NS - So that it doesn't appear in the figure?
+  }
+  else{ #Label remaining significant genes
+    data[i,10] <- "significant"
+    data[i, 3] <- NA #Delete gene name for significant - So that it doesn't appear in the figure?
+  }
+    
+}
+```
+
+### Volcano plot ggplot
+
+```{r}
+
+pdf("volcano_plot.pdf", height = 5, width = 7)
+
+vol <- ggplot(data, aes(x = logFC, y = -log10(adj.P.Val), colour = logFC)) + geom_point(size=1, alpha = 3, na.rm = T) + scale_color_gradientn(colors = c("#003300", "#325b32","#668466","#ffffcc","#670000")) + theme(legend.title=element_text(size=10),legend.text=element_text(size=6),
+        legend.key.size=unit(0.7,"line"),plot.title = element_text(hjust = 0.5),
+        axis.title.y=element_text(size=10),axis.title.x=element_text(size=10),
+        axis.text.y=element_text(size=10),axis.text.x=element_text(size=10)) + labs(x="Log2 Fold Change", y="-log10 (adj.P.Val)") + xlim(-2.5, 2.5) + geom_text_repel(aes(label = Gene_name), size=2.5, color = "black")
+
+vol
+
+dev.off()
+```
+
+
+#Filter for significant changes
+
+
+```{r}
+sig_Gene_names <- raw_data$Gene_name[data$color != "NS"] #Gene names are stored in raw data; data$color indicates significance
+```
+
+
+
+
+
+
+```{r}
+
+filtered_data <- data.frame(sig_NA., sig_Accession, sig_Gene_name, sig_logFC, sig_AveExp, sig_t, sig_P.Value, sig_adj.P.Val, sig_B)
+
+
 sig_NA.<- c() #vector to store IDs of dif_regulated genes
 sig_Accession <- c() #vector to store Accession numbers of dif_regulated genes
 sig_Gene_name <- c() #vector to store IDs of dif_regulated genes
@@ -48,11 +120,11 @@ sig_B <- c() #vector to store B of dif_regulated genes
 
 for (i in seq(raw_data$NA.)) {
   #print(i)
-    if(raw_data$adj.P.Val[i]<0.05){ #Criteria for differentially expressed genes
+    if(raw_data$adj.P.Val[i]<0.05){ #Criteria for deferentially expressed genes
       sig_NA. <- c(sig_NA., raw_data$NA.[i])
       sig_Accession <- c(sig_Accession, raw_data$Accession[i])
       sig_Gene_name <- c(sig_Gene_name, raw_data$Gene_name[i])
-      sig_sig_logFC <- c(sig_logFC, raw_data$logFC[i])
+      sig_logFC <- c(sig_logFC, raw_data$logFC[i])
       sig_AveExp <- c(sig_AveExp, raw_data$AveExp[i])
       sig_t <- c(sig_t, raw_data$t[i])
       sig_P.Value <- c(sig_P.Value, raw_data$P.Value[i])
@@ -65,22 +137,23 @@ for (i in seq(raw_data$NA.)) {
 ### Save filtered results in a file
 
 ```{r}
-data <- data.frame(sig_NA., sig_Accession, sig_Gene_name, sig_logFC, sig_AveExp, sig_t, sig_P.Value, sig_adj.P.Val, sig_B)
+filtered_data <- data.frame(sig_NA., sig_Accession, sig_Gene_name, sig_logFC, sig_AveExp, sig_t, sig_P.Value, sig_adj.P.Val, sig_B)
 
-write.xlsx(data,
+write.xlsx(filtered_data,
            file =  "CoV2_UN_48_filtered.xlsx",
            sheetName = "CoV2_UN_48_filtered",
            col.names = TRUE, row.names = FALSE, append = FALSE)
 
-
 ```
 
-### File with dif_expressed for Enrichr
+
+
+### File with dif_expressed Gene names for Enrichr
 There's one "Uncharacterized protein" - A0A1W2PPE3 https://www.uniprot.org/uniprot/A0A1W2PPE3.
 Since there is no information about the gene it corresponds to, it is not included for Gene Enrichment Analysis
 
 ```{r}
-write(Gene_name, "dif_expressed genes.txt")
+write(sig_Gene_name, "dif_expressed genes.txt")
 
 ```
 ### Inport Enrichr results
