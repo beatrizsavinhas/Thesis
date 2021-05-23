@@ -90,76 +90,25 @@ vol
 dev.off()
 ```
 
-
-#Filter for significant changes
-
+## Enrichr
+### Filter for significant changes
 
 ```{r}
 sig_Gene_names <- raw_data$Gene_name[data$color != "NS"] #Gene names are stored in raw data; data$color indicates significance
 ```
-
-
-
-
-
-
-```{r}
-
-filtered_data <- data.frame(sig_NA., sig_Accession, sig_Gene_name, sig_logFC, sig_AveExp, sig_t, sig_P.Value, sig_adj.P.Val, sig_B)
-
-
-sig_NA.<- c() #vector to store IDs of dif_regulated genes
-sig_Accession <- c() #vector to store Accession numbers of dif_regulated genes
-sig_Gene_name <- c() #vector to store IDs of dif_regulated genes
-sig_logFC <- c() #vector to store IDs of dif_regulated genes
-sig_AveExp <- c() #vector to store IDs of dif_regulated genes
-sig_t <- c() #vector to store IDs of dif_regulated genes
-sig_P.Value <- c() #vector to store P.value of dif_regulated genes
-sig_adj.P.Val <- c() #vector to store P.value of dif_regulated genes
-sig_B <- c() #vector to store B of dif_regulated genes
-
-for (i in seq(raw_data$NA.)) {
-  #print(i)
-    if(raw_data$adj.P.Val[i]<0.05){ #Criteria for deferentially expressed genes
-      sig_NA. <- c(sig_NA., raw_data$NA.[i])
-      sig_Accession <- c(sig_Accession, raw_data$Accession[i])
-      sig_Gene_name <- c(sig_Gene_name, raw_data$Gene_name[i])
-      sig_logFC <- c(sig_logFC, raw_data$logFC[i])
-      sig_AveExp <- c(sig_AveExp, raw_data$AveExp[i])
-      sig_t <- c(sig_t, raw_data$t[i])
-      sig_P.Value <- c(sig_P.Value, raw_data$P.Value[i])
-      sig_adj.P.Val <- c(sig_adj.P.Val, raw_data$adj.P.Val[i])
-      sig_B <- c(sig_B, raw_data$B[i])
-    }
-}
-```
-
-### Save filtered results in a file
-
-```{r}
-filtered_data <- data.frame(sig_NA., sig_Accession, sig_Gene_name, sig_logFC, sig_AveExp, sig_t, sig_P.Value, sig_adj.P.Val, sig_B)
-
-write.xlsx(filtered_data,
-           file =  "CoV2_UN_48_filtered.xlsx",
-           sheetName = "CoV2_UN_48_filtered",
-           col.names = TRUE, row.names = FALSE, append = FALSE)
-
-```
-
-
 
 ### File with dif_expressed Gene names for Enrichr
 There's one "Uncharacterized protein" - A0A1W2PPE3 https://www.uniprot.org/uniprot/A0A1W2PPE3.
 Since there is no information about the gene it corresponds to, it is not included for Gene Enrichment Analysis
 
 ```{r}
-write(sig_Gene_name, "dif_expressed genes.txt")
+write(sig_Gene_names, "dif_expressed genes.txt")
 
 ```
-### Inport Enrichr results
 
+### Import Enrichr results
 
-https://maayanlab.cloud/Enrichr/enrich?dataset=30e6c406dae9ea6ae51025eb9d2cd92b
+https://maayanlab.cloud/Enrichr/enrich?dataset=b1d4e7523b8b3201144d0f5f8a17f874
 
 Library: BioPlanet 2019
 
@@ -167,17 +116,16 @@ Library: BioPlanet 2019
 *The smaller the p-value, the higher the chance that the genes belong to that pathway, right?*
 
 ```{r}
+enrichr <- read.delim("Enrichr_BioPlanet_2019_table.txt")
 
 ```
 
-- put on git hub
-- do vulcano plot
 
 
 #Build a heatmap from our data
 BiocManager::install("ComplexHeatmap")
 
-
+It makes no sense to build a heatmap from only UN_48h, right??
 ```{r}
 
 
