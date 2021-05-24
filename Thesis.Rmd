@@ -12,6 +12,8 @@ rm(list=ls())
 ```{r}
 library("xlsx") #Read/Write excel files
 library(ggrepel) #plots
+library(clusterProfiler)
+library(org.Hs.eg.db)
 ```
 ### set directory
 ```{r setup}
@@ -122,7 +124,29 @@ enrichr <- read.delim("Enrichr_BioPlanet_2019_table.txt")
 
 
 
-#Build a heatmap from our data
+
+## Pathway enrichment using ClusterProfiler
+
+```{r}
+covid <- bitr(sig_Gene_names, fromType = "SYMBOL", toType = c("ENTREZID"), OrgDb = org.Hs.eg.db)
+```
+
+```{r}
+require(reactome.db)
+require(ReactomePA)
+res <- compareCluster(list(COV248 = covid$ENTREZID), fun = "enrichPathway")
+```
+
+
+```{r}
+pdf("Comparison_pathways.pdf", width = 12)
+dotplot(res)
+dev.off()
+```
+
+
+
+# Build a heatmap from our data
 BiocManager::install("ComplexHeatmap")
 
 It makes no sense to build a heatmap from only UN_48h, right??
