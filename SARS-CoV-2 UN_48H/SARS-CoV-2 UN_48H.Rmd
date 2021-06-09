@@ -1,0 +1,566 @@
+---
+title: "Thesis project - SARS-CoV-2 UN_48H"
+output: html_notebook
+---
+
+## Setup environment 
+
+### Clean environment and set directory
+```{r}
+rm(list=ls())
+knitr::opts_knit$set(root.dir = normalizePath("C:\\Users\\beasav\\OneDrive - KI.SE\\Bioinformatics\\Thesis\\SARS-CoV-2 UN_48H\\Data and figures"))
+```
+
+### Libraries
+```{r}
+library("xlsx") #Read/Write excel files
+library(ggrepel) #plots
+library(clusterProfiler)
+library(org.Hs.eg.db)
+```
+
+## Load data
+SARS-CoV-2 UN_48
+```{r}
+data <- read.xlsx("covid-19_proteomics_UNINF_vs_H48PI_DGE_results.xlsx",1)
+
+```
+
+### Check for missing values in our data
+
+How to do this????
+The file does not show any NA value
+
+
+### Filter significantly regulted genes
+
+```{r}
+data$Significance <- NA #create a Color column
+
+for (i in 1:nrow(data)){
+  if(data[i, 4] > 0.3 & data[i, 8] < 0.05){
+    data[i, 10] <- "up_regulated"
+  }
+  else if(data[i, 4] < -0.3 & data[i, 8] < 0.05){
+    data[i, 10] <- "down_regulated"
+  }
+  else if(data[i, 8] > 0.05){
+    data[i, 10] <- "NS" #Non significant
+    #data[i, 3] <- NA #Delete gene name for NS - So that it doesn't appear in the figure?
+  }
+  else{ #Label remaining significant genes
+    data[i,10] <- "significant"
+    #data[i, 3] <- NA #Delete gene name for significant - So that it doesn't appear in the figure?
+  }
+    
+}
+```
+
+
+---
+## Build PCA plot
+
+https://www.nonlinear.com/progenesis/qi-for-proteomics/v4.2/faq/pca.aspx
+
+
+Flora's code: https://github.com/neogilab/COVID_IFN/blob/main/Proteomics_MERS_v1.Rmd
+
+
+
+Does not make sense for only significant values.
+```{r}
+#pca_data <- data.frame(group = condition, t(as.matrix(data_norm)))
+```
+
+---
+## Build a heatmap from our data
+BiocManager::install("ComplexHeatmap")
+
+It makes no sense to build a heatmap from only UN_48h, right??
+
+3 samples for each condition!!
+```{r}
+
+
+
+
+
+```
+
+---
+## Building Vulcano plot
+
+### Clean labels for nonsignificant and significant genes
+```{r}
+data_vol <- data
+
+for (i in 1:nrow(data_vol)){
+  if(data_vol[i, 10] == "NS"){
+    data_vol[i, 3] <- NA #Delete gene name for NS - So that it doesn't appear in the figure?
+  }
+  else if(data_vol[i, 10] == "significant") { #Label remaining significant genes
+    data_vol[i, 3] <- NA #Delete gene name for significant - So that it doesn't appear in the figure?
+  }
+    
+}
+```
+
+### Volcano plot ggplot
+
+To change the backgorund: Ggplots theme *Check this*
+https://www.datanovia.com/en/blog/ggplot-themes-gallery/
+
+Original color pallet: "#003300", "#325b32","#668466","#ffffcc","#670000"
+Alternative color pallet: "#006633", "#00994C","#CC6600", "#CC0000", "#990000"
+
+```{r}
+
+pdf("volcano_plot.pdf", height = 5, width = 7)
+
+vol <- ggplot(data = data_vol, aes(x = logFC, y = -log10(adj.P.Val), colour = logFC)) + geom_point(size=1, alpha = 3, na.rm = T) + scale_color_gradientn(colors = c("#003300", "#325b32","#668466","#F2490C","#670000")) + theme(legend.title=element_text(size=10), legend.text=element_text(size=6),
+        legend.key.size=unit(0.7,"line"), plot.title = element_text(hjust = 0.5),
+        axis.title.y=element_text(size=10), axis.title.x=element_text(size=10),
+        axis.text.y=element_text(size=10), axis.text.x=element_text(size=10)) + labs(x="Log2 Fold Change", y="-log10 (adj.P.Val)") + xlim(-2.5, 2.5) + geom_text_repel(aes(label = Gene_name), size=2.5, color = "black") + theme_light()
+
+vol
+
+dev.off()
+```
+
+#### Add horizontal line for p<0.05 in volcano plot
+
+```{r}
+pdf("volcano_plot_line.pdf", height = 5, width = 7)
+
+vol <- ggplot(data = data_vol, aes(x = logFC, y = -log10(adj.P.Val), colour = logFC)) + geom_point(size=1, alpha = 3, na.rm = T) + scale_color_gradientn(colors = c("#003300", "#325b32","#668466","#F2490C","#670000")) + theme(legend.title=element_text(size=10), legend.text=element_text(size=6),
+        legend.key.size=unit(0.7,"line"), plot.title = element_text(hjust = 0.5),
+        axis.title.y=element_text(size=10), axis.title.x=element_text(size=10),
+        axis.text.y=element_text(size=10), axis.text.x=element_text(size=10)) + labs(x="Log2 Fold Change", y="-log10 (adj.P.Val)") + xlim(-2.5, 2.5) + geom_text_repel(aes(label = Gene_name), size=2.5, color = "black") + theme_light() + geom_hline(yintercept= - log10(0.05), linetype="dashed")
+
+vol
+
+dev.off()
+
+#ggsave("volcano_plot_line.png", vol, height = 5, width = 7)
+
+rm(vol)
+rm(data_vol)
+```
+
+
+
+---
+## Enrichr - Bioplanet 2019
+### Filter for significant changes
+
+```{r}
+sig_Gene_names <- data$Gene_name[data$Significance != "NS"] #Gene names are stored in raw data; data$Significance indicates significance
+```
+
+### File with dif_expressed Gene names for Enrichr
+There's one "Uncharacterized protein" - A0A1W2PPE3 https://www.uniprot.org/uniprot/A0A1W2PPE3
+Since there is no information about the gene it corresponds to, it is not included for Gene Enrichment Analysis
+
+```{r}
+write(sig_Gene_names, "dif_expressed genes.txt")
+
+```
+
+### Import Enrichr results
+
+https://maayanlab.cloud/Enrichr/enrich?dataset=b1d4e7523b8b3201144d0f5f8a17f874
+
+Library: BioPlanet 2019
+
+"The p-value is computed from the Fisher exact test which is a proportion test that assumes a binomial distribution and independence for probability of any gene belonging to any set."
+
+*The smaller the p-value, the higher the chance that the genes belong to that pathway, right?*
+
+```{r}
+enrichr_raw <- read.delim("Enrichr_BioPlanet_2019_table.txt")
+
+```
+
+### Filter for only important info
+```{r}
+enrichr_sig <- data.frame(Term = c(), Overlap = c(), Adjusted.P.value = c(), Genes = c())
+
+for (i in 1:nrow(enrichr_raw)){
+  if (enrichr_raw$Adjusted.P.value[i] < 0.05) {
+    sig = data.frame (Term = enrichr_raw$Term[i], Overlap = enrichr_raw$Overlap[i], Adjusted.P.value = enrichr_raw$Adjusted.P.value[i], Genes = enrichr_raw$Genes[i])
+    enrichr_sig <- rbind(enrichr_sig, sig)
+  }
+}
+
+```
+
+### Write into file
+
+```{r}
+write.xlsx(enrichr_sig, "Enrichr_sig.xlsx", sheetName = "Enrichr_sig", col.names= TRUE, row.names = FALSE)
+```
+
+### Convert overlap into number and round to 2 decimal places
+
+```{r}
+for (i in 1:nrow(enrichr_sig)){
+  enrichr_sig$Overlap[i] <- round(eval(parse(text = enrichr_sig$Overlap[i])), digits = 2) #2 decimal places
+}
+
+#and order from top to bottom overlap
+#top <- top[with(top, order(Overlap)),]
+
+```
+
+### Select the top100 pathways
+According to Flora the p-value tells more than the overlap.
+
+enrichr dataset is ordered based on p-value
+```{r}
+enrichr_top <- data.frame(Term = c(), Overlap = c(), Adjusted.P.value = c())
+
+
+# do top enrichr but with Interferon and pvalue < 0.05
+for ( i in 1:100) {
+  top_pathway <- data.frame(Term = enrichr_sig$Term[i], Overlap = enrichr_sig$Overlap[i], Adjusted.P.value = enrichr_sig$Adjusted.P.value[i] )
+    
+  enrichr_top <- rbind(enrichr_top, top_pathway)
+}
+
+rm(top_pathway)
+
+```
+
+#### Building dot plot
+```{r}
+#order from low to high p-value
+enrichr_top$CoV2_UN_48 <- 1
+enrichr_top$Term <- factor(enrichr_top$Term, levels = enrichr_top$Term ) #To make it the right order for ggplot
+```
+
+
+```{r}
+
+pdf("Top_Comparison_pathways_enrichr_dot.pdf", width = 18, height = 20)
+p<-ggplot(enrichr_top, aes(x = CoV2_UN_48, y = Term)) + geom_point(aes(size = Overlap, color = Adjusted.P.value)) + scale_color_gradientn(colors = c("#668466", "#CC0000")) + theme_classic()
+
+p
+
+dev.off()
+
+rm(p)
+
+```
+#### Building top100 bar plot
+
+```{r}
+enrichr_top$Term <- factor(enrichr_top$Term, levels = enrichr_top$Term ) #To make it the right order for ggplot
+
+pdf("Comparison_pathways_enrichr_top100_bar.pdf", width = 18, height = 20)
+p<-ggplot(data = enrichr_top, aes(x = Term, y = Overlap)) + geom_bar(stat="identity", aes(fill = Adjusted.P.value)) + scale_fill_gradientn(colors = c("#668466", "#CC0000")) + coord_flip() + theme_light() + theme(axis.title.y=element_blank())
+
+p
+
+dev.off()
+
+rm(p)
+
+```
+### Select the IFN, ub and proteosome pathways
+According to Flora the p-value tells more than the overlap.
+
+enrichr dataset is ordered based on p-value
+```{r}
+enrichr_IFN <- data.frame(Term = c(), Overlap = c(), Adjusted.P.value = c())
+
+
+# do top enrichr but with Interferon and pvalue < 0.05
+for ( i in c(44, 45, 52, 131, 137)){ #Indexes of selected pathways
+  pathway_IFN <- data.frame(Term = enrichr_sig$Term[i], Overlap = enrichr_sig$Overlap[i], Adjusted.P.value = enrichr_sig$Adjusted.P.value[i], Genes =  enrichr_sig$Genes[i])
+  
+  enrichr_IFN <- rbind(enrichr_IFN, pathway_IFN)
+}
+
+rm(pathway_IFN)
+
+```
+
+#### Building bar plot
+
+```{r}
+enrichr_IFN$Term <- factor(enrichr_IFN$Term, levels = enrichr_IFN$Term ) #To make it the right order for ggplot
+
+pdf("Comparison_pathways_enrichr_IFN_bar.pdf", width = 10, height = 4)
+p<-ggplot(data = enrichr_IFN, aes(x = Term, y = Overlap)) + geom_bar(stat="identity", aes(fill = Adjusted.P.value)) + scale_fill_gradientn(colors = c("#668466", "#CC0000")) + coord_flip() + theme_light() + theme(axis.title.y=element_blank())
+
+p
+
+dev.off()
+
+rm(p)
+
+```
+
+
+
+---
+## Enrichr - KEGG_2021_Human
+
+### Import Enrichr results
+
+https://maayanlab.cloud/Enrichr/enrich?dataset=b1d4e7523b8b3201144d0f5f8a17f874
+
+Library: KEGG_2021_Human
+
+"The p-value is computed from the Fisher exact test which is a proportion test that assumes a binomial distribution and independence for probability of any gene belonging to any set."
+
+*The smaller the p-value, the higher the chance that the genes belong to that pathway, right?*
+
+```{r}
+enrichr <- read.delim("Enrichr_KEGG_2021_Human_table.txt")
+
+```
+
+### Filter for only important info
+```{r}
+enrichr_sig <- data.frame(Term = c(), Overlap = c(), Adjusted.P.value = c(), Genes = c())
+
+for (i in 1:nrow(enrichr)){
+  if (enrichr$Adjusted.P.value[i] < 0.05) {
+    sig = data.frame (Term = enrichr$Term[i], Overlap = enrichr$Overlap[i], Adjusted.P.value = enrichr$Adjusted.P.value[i], Genes = enrichr$Genes[i])
+    enrichr_sig <- rbind(enrichr_sig, sig)
+  }
+}
+
+#Update enrichr data.frame
+enrichr <- enrichr_sig
+
+rm(i)
+rm(sig)
+rm(enrichr_sig)
+```
+
+#### Convert overlap into number and round to 2 decimal places
+
+```{r}
+for (i in 1:nrow(enrichr)){
+  enrichr$Overlap[i] <- round(eval(parse(text = enrichr$Overlap[i])), digits = 2) #2 decimal places
+}
+
+rm(i)
+#and order from top to bottom overlap
+#top <- top[with(top, order(Overlap)),]
+
+```
+
+#### Write into file
+
+```{r}
+write.xlsx(enrichr, "Enrichr_KEGG_2021_sig.xlsx", sheetName = "Enrichr_sig", col.names= TRUE, row.names = FALSE)
+```
+
+
+### Select the top100 pathways
+According to Flora the p-value tells more than the overlap.
+
+enrichr dataset is ordered based on p-value
+```{r}
+enrichr_top <- data.frame(Term = c(), Overlap = c(), Adjusted.P.value = c())
+
+
+# do top enrichr but with Interferon and pvalue < 0.05
+for ( i in 1:100) {
+  top_pathway <- data.frame(Term = enrichr$Term[i], Overlap = enrichr$Overlap[i], Adjusted.P.value = enrichrenrichr$Adjusted.P.value[i] )
+    
+  enrichr_top <- rbind(enrichr_top, top_pathway)
+}
+
+rm(top_pathway)
+rm(i)
+
+```
+
+#### Building dot plot
+```{r}
+#order from low to high p-value
+enrichr_top$CoV2_UN_48 <- 1
+enrichr_top$Term <- factor(enrichr_top$Term, levels = enrichr_top$Term ) #To make it the right order for ggplot
+```
+
+
+```{r}
+
+pdf("Top_Comparison_pathways_enrichr_dot.pdf", width = 18, height = 20)
+p<-ggplot(enrichr_top, aes(x = CoV2_UN_48, y = Term)) + geom_point(aes(size = Overlap, color = Adjusted.P.value)) + scale_color_gradientn(colors = c("#668466", "#CC0000")) + theme_classic()
+
+p
+
+dev.off()
+
+rm(p)
+
+```
+#### Building top100 bar plot
+
+```{r}
+enrichr_top$Term <- factor(enrichr_top$Term, levels = enrichr_top$Term ) #To make it the right order for ggplot
+
+pdf("Comparison_pathways_enrichr_top100_bar.pdf", width = 18, height = 20)
+p<-ggplot(data = enrichr_top, aes(x = Term, y = Overlap)) + geom_bar(stat="identity", aes(fill = Adjusted.P.value)) + scale_fill_gradientn(colors = c("#668466", "#CC0000")) + coord_flip() + theme_light() + theme(axis.title.y=element_blank())
+
+p
+
+dev.off()
+
+rm(p)
+
+```
+### Select the IFN, ub and proteosome pathways
+According to Flora the p-value tells more than the overlap.
+
+enrichr dataset is ordered based on p-value
+```{r}
+enrichr_IFN <- data.frame(Term = c(), Overlap = c(), Adjusted.P.value = c())
+
+
+# do top enrichr but with Interferon and pvalue < 0.05
+for ( i in c(44, 45, 52, 131, 137)){ #Indexes of selected pathways
+  pathway_IFN <- data.frame(Term = enrichr_sig$Term[i], Overlap = enrichr_sig$Overlap[i], Adjusted.P.value = enrichr_sig$Adjusted.P.value[i], Genes =  enrichr_sig$Genes[i])
+  
+  enrichr_IFN <- rbind(enrichr_IFN, pathway_IFN)
+}
+
+rm(pathway_IFN)
+
+```
+
+#### Building bar plot
+
+```{r}
+enrichr_IFN$Term <- factor(enrichr_IFN$Term, levels = enrichr_IFN$Term ) #To make it the right order for ggplot
+
+pdf("Comparison_pathways_enrichr_IFN_bar.pdf", width = 10, height = 4)
+p<-ggplot(data = enrichr_IFN, aes(x = Term, y = Overlap)) + geom_bar(stat="identity", aes(fill = Adjusted.P.value)) + scale_fill_gradientn(colors = c("#668466", "#CC0000")) + coord_flip() + theme_light() + theme(axis.title.y=element_blank())
+
+p
+
+dev.off()
+
+rm(p)
+
+```
+
+
+
+
+---
+## Enrichr - Reactome_2016
+
+### Import Enrichr results
+
+https://maayanlab.cloud/Enrichr/enrich?dataset=b1d4e7523b8b3201144d0f5f8a17f874
+
+Library: Reactome_2016
+
+"The p-value is computed from the Fisher exact test which is a proportion test that assumes a binomial distribution and independence for probability of any gene belonging to any set."
+
+*The smaller the p-value, the higher the chance that the genes belong to that pathway, right?*
+
+```{r}
+enrichr <- read.delim("Enrichr_Reactome_2016_table.txt")
+
+```
+
+### Filter for only important info
+```{r}
+enrichr_sig <- data.frame(Term = c(), Overlap = c(), Adjusted.P.value = c(), Genes = c())
+
+for (i in 1:nrow(enrichr)){
+  if (enrichr$Adjusted.P.value[i] < 0.05) {
+    sig = data.frame (Term = enrichr$Term[i], Overlap = enrichr$Overlap[i], Adjusted.P.value = enrichr$Adjusted.P.value[i], Genes = enrichr$Genes[i])
+    enrichr_sig <- rbind(enrichr_sig, sig)
+  }
+}
+
+#Update enrichr data.frame
+enrichr <- enrichr_sig
+
+rm(i)
+rm(sig)
+rm(enrichr_sig)
+```
+
+### Convert overlap into number and round to 2 decimal places
+
+```{r}
+for (i in 1:nrow(enrichr)){
+  enrichr$Overlap[i] <- round(eval(parse(text = enrichr$Overlap[i])), digits = 2) #2 decimal places
+}
+
+rm(i)
+#and order from top to bottom overlap
+#top <- top[with(top, order(Overlap)),]
+
+```
+
+### Write into file
+
+```{r}
+write.xlsx(enrichr, "Enrichr_Reactome_2016_sig.xlsx", sheetName = "Enrichr_sig", col.names= TRUE, row.names = FALSE)
+```
+
+
+---
+## Pathway network for cytoscape
+
+### Make list of pathways and genes found from the IFN pathways
+
+```{r}
+
+path_genes <- data.frame(Term = c(), Gene = c())
+
+type <- data.frame(Node = c(), Type = c())
+
+for (i in 1:nrow(enrichr_IFN)){ #Only the 10 most significant pathways
+  
+  #Add gene to type table
+  node <- data.frame(enrichr_IFN$Term[i], "Pathway")
+  names(node) <- c("Node", "Type")
+  
+  type <- rbind(type, node)
+  
+  #Get string of genes
+  genes <- strsplit(enrichr_IFN$Genes[i], ";")
+  genes <- genes[[1]]
+  
+  for (l in 1:length(genes)){#Create an entry in the data frame for every gene
+    
+    #Add gene to type table
+    node <- data.frame(genes[l], "Gene")
+    names(node) <- c("Node", "Type")
+    type <- rbind(type, node)
+    
+    #Add Pathway_Gene
+    edge <- data.frame(enrichr_IFN$Term[i], genes[l])
+    names(edge) <- c("Term", "Gene") #Data.frames should have consistent rownames
+    
+    path_genes <- rbind(path_genes, edge)
+  }
+}
+
+#Delete temporary variables
+rm(node)
+rm(edge)
+rm(path_genes)
+```
+
+
+### Write lists on files for Cytoscape
+
+```{r}
+write.xlsx(path_genes, "Cytoscape_Pathway_Genes_IFN.xlsx", sheetName = "Pathway_Genes", col.names= TRUE, row.names = FALSE)
+
+write.xlsx(type, "Cytoscape_Type_IFN.xlsx", sheetName = "Type", col.names= TRUE, row.names = FALSE)
+```
+
+

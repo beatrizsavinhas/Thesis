@@ -1,0 +1,322 @@
+---
+title: "Thesis project - "
+output: html_notebook
+---
+
+## Setup environment 
+
+### Clean environment and set directory
+```{r}
+rm(list=ls())
+
+knitr::opts_knit$set(root.dir = normalizePath("C:\\Users\\beasav\\OneDrive - KI.SE\\Bioinformatics\\Thesis"))
+
+```
+
+### Libraries
+```{r}
+library("xlsx") #Read/Write excel files
+library(ggrepel) #plots
+library(clusterProfiler)
+library(org.Hs.eg.db)
+```
+
+# Enrichr_KEGG_2021
+## Load data
+
+SARS-CoV-2 UN_48H
+SARS-CoV-1 UN48_48H
+MERS-CoV UN_24H
+
+```{r}
+CoV2 <- read.xlsx("SARS-CoV-2 UN_48H\\Data and figures\\Enrichr_KEGG_2021_sig.xlsx",1)
+CoV1 <- read.xlsx("SARS-CoV-1 UN_48H\\Data and figures\\Enrichr_KEGG_2021_sig.xlsx",1)
+MERS <- read.xlsx("MERS-CoV UN_24H\\Data and figures\\Enrichr_KEGG_2021_sig.xlsx",1)
+```
+
+## Venn diagram
+```{r}
+library(VennDiagram)
+
+# Chart
+venn.diagram(
+  x = list(CoV1$Term, MERS$Term, CoV2$Term),
+  category.names = c("SARS-CoV-1", "MERS-CoV", "SARS-CoV-2"),
+  filename = 'Venn_diagram_KEGG_2021.png',
+  output=TRUE,
+  
+  #Title
+  main = "KEGG 2021",
+  main.pos = c(0.5 , 1),
+  main.fontfamily = "sans",
+  main.cex = 2,
+  main.just = c(0.5, 0.5),
+  
+  imagetype="png",
+          #height = 480 , 
+          #width = 3000 , 
+          #resolution = 300,
+          #compression = "lzw",
+          lwd = 1,
+          col=c('#70abb3', "#f37736", "#7bc043"),
+          fill = c(alpha('#70abb3',0.3), alpha("#f37736",0.3), alpha("#7bc043",0.3)),
+          cex = 0.9,
+          fontfamily = "sans",
+
+          cat.cex = 1,
+          cat.default.pos = "outer",
+          cat.pos = c(-170, 170, 0),
+          cat.dist = c(0.025, 0.025, 0.02),
+          cat.fontfamily = "sans",
+          cat.col = c('#70abb3', "#f37736", "#7bc043"),
+          rotation = 1
+)
+```
+
+## Dot plot
+
+### Find common pathways
+#### Vectors with the indexes of the common pathways
+```{r}
+
+CoV2_CoV1 = c()
+CoV2_MERS = c()
+CoV1_MERS = c()
+All = c()
+
+for (i in 1:nrow(CoV2)){
+  if (CoV2$Term[i] %in% CoV1$Term){
+    CoV2_CoV1 = c(CoV2_CoV1, CoV2$Term[i])
+  }
+  if (CoV2$Term[i] %in% MERS$Term){
+    CoV2_MERS = c(CoV2_MERS, CoV2$Term[i])
+  }
+}
+
+for (i in 1:nrow(CoV1)){
+  if (CoV1$Term[i] %in% MERS$Term){
+    CoV1_MERS = c(CoV1_MERS, CoV1$Term[i])
+  }
+}
+
+for (i in 1:length(CoV1_MERS)){
+  if (CoV1_MERS[i] %in% CoV2_MERS && CoV1_MERS[i] %in% CoV2_MERS){
+    All = c(All, CoV1_MERS[i])
+  }
+}
+
+rm(i)
+
+```
+
+#### Data.frames with info about common pathways from the different viruses
+
+```{r}
+CoV2_common <- data.frame(Term = c(), Overlap = c(), Adjusted.P.value = c(), Genes = c())
+CoV1_common <- data.frame(Term = c(), Overlap = c(), Adjusted.P.value = c(), Genes = c())
+MERS_common <- data.frame(Term = c(), Overlap = c(), Adjusted.P.value = c(), Genes = c())
+
+
+for (i in match(All, CoV2$Term)){
+  C2 <- data.frame(Term = CoV2$Term[i], Overlap = CoV2$Overlap[i], Adjusted.P.value = CoV2$Adjusted.P.value[i], Genes = CoV2$Genes[i])
+  CoV2_common <- rbind(CoV2_common, C2)
+  
+}
+
+for (i in match(All, CoV1$Term)){
+  C1 <- data.frame(Term = CoV1$Term[i], Overlap = CoV1$Overlap[i], Adjusted.P.value = CoV1$Adjusted.P.value[i], Genes = CoV1$Genes[i])
+  CoV1_common <- rbind(CoV1_common, C1)
+  
+}
+for (i in match(All, MERS$Term)){
+  CM <- data.frame(Term = MERS$Term[i], Overlap = MERS$Overlap[i], Adjusted.P.value = MERS$Adjusted.P.value[i], Genes = MERS$Genes[i])
+  MERS_common <- rbind(MERS_common, CM)
+  
+}
+
+#To make it the right order for ggplot
+
+CoV2_common$position <- "SARS-CoV-2"
+CoV2$Term <- factor(CoV2$Term, levels = CoV2$Term )
+
+CoV1_common$position <- "SARS-CoV-1"
+CoV1$Term <- factor(CoV1$Term, levels = CoV1$Term )
+
+MERS_common$position <- "MERS-CoV"
+MERS$Term <- factor(MERS$Term, levels = MERS$Term )
+
+
+rm(C2)
+rm(C1)
+rm(CM)
+```
+
+### Dot plot
+
+```{r}
+plot <- rbind(CoV2_common, CoV1_common, MERS_common)
+plot$position <- factor(plot$position, levels = c("SARS-CoV-2", "SARS-CoV-1", "MERS-CoV"))
+
+pdf("Common_pathways_enrichr_KEGG_2021_dot.pdf", width = 7, height = 5)
+
+p<-ggplot(plot, aes(x = position, y = Term)) + geom_point(aes(size = Overlap, color = Adjusted.P.value)) + scale_color_gradientn(colors = c("#668466", "#CC0000")) + theme_classic() + theme(axis.title.x=element_blank(), axis.ticks.x=element_blank()) 
+
+p
+
+dev.off()
+
+rm(p)
+rm(plot)
+
+```
+
+
+# Enrichr_Reactome_2016
+## Load data
+
+SARS-CoV-2 UN_48H
+SARS-CoV-1 UN48_48H
+MERS-CoV UN_24H
+
+```{r}
+CoV2 <- read.xlsx("SARS-CoV-2 UN_48H\\Data and figures\\Enrichr_Reactome_2016_sig.xlsx",1)
+CoV1 <- read.xlsx("SARS-CoV-1 UN_48H\\Data and figures\\Enrichr_Reactome_2016_sig.xlsx",1)
+MERS <- read.xlsx("MERS-CoV UN_24H\\Data and figures\\Enrichr_Reactome_2016_sig.xlsx",1)
+```
+
+## Venn diagram
+```{r}
+library(VennDiagram)
+
+# Chart
+venn.diagram(
+  x = list(CoV1$Term, MERS$Term, CoV2$Term),
+  category.names = c("SARS-CoV-1", "MERS-CoV", "SARS-CoV-2"),
+  filename = 'Venn_diagram_Reactome_2016.png',
+  output=TRUE,
+  
+  #Title
+  main = "Reactome 2016",
+  main.pos = c(0.5 , 1.05),
+  main.fontfamily = "sans",
+  main.cex = 2,
+  main.just = c(0.5, 0.5),
+  
+  imagetype="png",
+          #height = 480 , 
+          #width = 3000 , 
+          #resolution = 300,
+          #compression = "lzw",
+          lwd = 1,
+          col=c('#70abb3', "#f37736", "#7bc043"),
+          fill = c(alpha('#70abb3',0.3), alpha("#f37736",0.3), alpha("#7bc043",0.3)),
+          cex = 0.9,
+          fontfamily = "sans",
+
+          cat.cex = 1,
+          cat.default.pos = "outer",
+          cat.pos = c(-10, 10, 180),
+          cat.dist = c(0.025, 0.025, 0.02),
+          cat.fontfamily = "sans",
+          cat.col = c('#70abb3', "#f37736", "#7bc043"),
+          rotation = 1
+)
+```
+
+## Dot plot
+
+### Find common pathways
+#### Vectors with the indexes of the common pathways
+```{r}
+
+CoV2_CoV1 = c()
+CoV2_MERS = c()
+CoV1_MERS = c()
+All = c()
+
+for (i in 1:nrow(CoV2)){
+  if (CoV2$Term[i] %in% CoV1$Term){
+    CoV2_CoV1 = c(CoV2_CoV1, CoV2$Term[i])
+  }
+  if (CoV2$Term[i] %in% MERS$Term){
+    CoV2_MERS = c(CoV2_MERS, CoV2$Term[i])
+  }
+}
+
+for (i in 1:nrow(CoV1)){
+  if (CoV1$Term[i] %in% MERS$Term){
+    CoV1_MERS = c(CoV1_MERS, CoV1$Term[i])
+  }
+}
+
+for (i in 1:length(CoV1_MERS)){
+  if (CoV1_MERS[i] %in% CoV2_MERS && CoV1_MERS[i] %in% CoV2_MERS){
+    All = c(All, CoV1_MERS[i])
+  }
+}
+
+rm(i)
+
+```
+
+#### Data.frames with info about common pathways from the different viruses
+
+```{r}
+CoV2_common <- data.frame(Term = c(), Overlap = c(), Adjusted.P.value = c(), Genes = c())
+CoV1_common <- data.frame(Term = c(), Overlap = c(), Adjusted.P.value = c(), Genes = c())
+MERS_common <- data.frame(Term = c(), Overlap = c(), Adjusted.P.value = c(), Genes = c())
+
+
+for (i in match(All, CoV2$Term)){
+  C2 <- data.frame(Term = CoV2$Term[i], Overlap = CoV2$Overlap[i], Adjusted.P.value = CoV2$Adjusted.P.value[i], Genes = CoV2$Genes[i])
+  CoV2_common <- rbind(CoV2_common, C2)
+  
+}
+
+for (i in match(All, CoV1$Term)){
+  C1 <- data.frame(Term = CoV1$Term[i], Overlap = CoV1$Overlap[i], Adjusted.P.value = CoV1$Adjusted.P.value[i], Genes = CoV1$Genes[i])
+  CoV1_common <- rbind(CoV1_common, C1)
+  
+}
+for (i in match(All, MERS$Term)){
+  CM <- data.frame(Term = MERS$Term[i], Overlap = MERS$Overlap[i], Adjusted.P.value = MERS$Adjusted.P.value[i], Genes = MERS$Genes[i])
+  MERS_common <- rbind(MERS_common, CM)
+  
+}
+
+#To make it the right order for ggplot
+
+CoV2_common$position <- "SARS-CoV-2"
+CoV2$Term <- factor(CoV2$Term, levels = CoV2$Term )
+
+CoV1_common$position <- "SARS-CoV-1"
+CoV1$Term <- factor(CoV1$Term, levels = CoV1$Term )
+
+MERS_common$position <- "MERS-CoV"
+MERS$Term <- factor(MERS$Term, levels = MERS$Term )
+
+
+rm(C2)
+rm(C1)
+rm(CM)
+```
+
+### Dot plot
+
+```{r}
+plot <- rbind(CoV2_common, CoV1_common, MERS_common)
+plot$position <- factor(plot$position, levels = c("SARS-CoV-2", "SARS-CoV-1", "MERS-CoV"))
+
+pdf("Common_pathways_enrichr_Reactome_2016_dot.pdf", width = 13, height = 18)
+
+p<-ggplot(plot, aes(x = position, y = Term)) + geom_point(aes(size = Overlap, color = Adjusted.P.value)) + scale_color_gradientn(colors = c("#668466", "#CC0000")) + theme_classic() + theme(axis.title.x=element_blank(), axis.ticks.x=element_blank()) 
+
+p
+
+dev.off()
+
+rm(p)
+rm(plot)
+
+```
+
