@@ -6,7 +6,7 @@ output: html_notebook
 ## Setup environment 
 
 ### Clean environment and set directory
-```{r}
+```{r setup}
 rm(list=ls())
 
 knitr::opts_knit$set(root.dir = normalizePath("C:\\Users\\beasav\\OneDrive - KI.SE\\Bioinformatics\\Thesis"))
@@ -21,6 +21,7 @@ library(clusterProfiler)
 library(org.Hs.eg.db)
 ```
 
+---
 # Enrichr_KEGG_2021
 ## Load data
 
@@ -73,10 +74,8 @@ venn.diagram(
 )
 ```
 
-## Dot plot
-
-### Find common pathways
-#### Vectors with the indexes of the common pathways
+## Find common pathways
+### Vectors with the indexes of the common pathways
 ```{r}
 
 CoV2_CoV1 = c()
@@ -109,7 +108,7 @@ rm(i)
 
 ```
 
-#### Data.frames with info about common pathways from the different viruses
+### Data.frames with info about common pathways from the different viruses
 
 ```{r}
 CoV2_common <- data.frame(Term = c(), Overlap = c(), Adjusted.P.value = c(), Genes = c())
@@ -151,7 +150,7 @@ rm(C1)
 rm(CM)
 ```
 
-### Dot plot
+## Dot plot
 
 ```{r}
 plot <- rbind(CoV2_common, CoV1_common, MERS_common)
@@ -171,152 +170,80 @@ rm(plot)
 ```
 
 
-# Enrichr_Reactome_2016
-## Load data
 
-SARS-CoV-2 UN_48H
-SARS-CoV-1 UN48_48H
-MERS-CoV UN_24H
+# Heatmap, coronavirus disease
+## Load KEGG_2021 hsa05171 - Coronavirus disease pathway genes
+
+http://rest.kegg.jp/get/hsa05171
 
 ```{r}
-CoV2 <- read.xlsx("SARS-CoV-2 UN_48H\\Data and figures\\Enrichr_Reactome_2016_sig.xlsx",1)
-CoV1 <- read.xlsx("SARS-CoV-1 UN_48H\\Data and figures\\Enrichr_Reactome_2016_sig.xlsx",1)
-MERS <- read.xlsx("MERS-CoV UN_24H\\Data and figures\\Enrichr_Reactome_2016_sig.xlsx",1)
+genes <- read.delim("KEGG_hsa05171_Coronavirus disease_genes.txt", header = FALSE)
+genes <- genes$V1
 ```
 
-## Venn diagram
+
+## Load Abundance data from all viruses
+
 ```{r}
-library(VennDiagram)
-
-# Chart
-venn.diagram(
-  x = list(CoV1$Term, MERS$Term, CoV2$Term),
-  category.names = c("SARS-CoV-1", "MERS-CoV", "SARS-CoV-2"),
-  filename = 'Venn_diagram_Reactome_2016.png',
-  output=TRUE,
-  
-  #Title
-  main = "Reactome 2016",
-  main.pos = c(0.5 , 1.05),
-  main.fontfamily = "sans",
-  main.cex = 2,
-  main.just = c(0.5, 0.5),
-  
-  imagetype="png",
-          #height = 480 , 
-          #width = 3000 , 
-          #resolution = 300,
-          #compression = "lzw",
-          lwd = 1,
-          col=c('#70abb3', "#f37736", "#7bc043"),
-          fill = c(alpha('#70abb3',0.3), alpha("#f37736",0.3), alpha("#7bc043",0.3)),
-          cex = 0.9,
-          fontfamily = "sans",
-
-          cat.cex = 1,
-          cat.default.pos = "outer",
-          cat.pos = c(-10, 10, 180),
-          cat.dist = c(0.025, 0.025, 0.02),
-          cat.fontfamily = "sans",
-          cat.col = c('#70abb3', "#f37736", "#7bc043"),
-          rotation = 1
-)
-```
-
-## Dot plot
-
-### Find common pathways
-#### Vectors with the indexes of the common pathways
-```{r}
-
-CoV2_CoV1 = c()
-CoV2_MERS = c()
-CoV1_MERS = c()
-All = c()
-
-for (i in 1:nrow(CoV2)){
-  if (CoV2$Term[i] %in% CoV1$Term){
-    CoV2_CoV1 = c(CoV2_CoV1, CoV2$Term[i])
-  }
-  if (CoV2$Term[i] %in% MERS$Term){
-    CoV2_MERS = c(CoV2_MERS, CoV2$Term[i])
-  }
-}
-
-for (i in 1:nrow(CoV1)){
-  if (CoV1$Term[i] %in% MERS$Term){
-    CoV1_MERS = c(CoV1_MERS, CoV1$Term[i])
-  }
-}
-
-for (i in 1:length(CoV1_MERS)){
-  if (CoV1_MERS[i] %in% CoV2_MERS && CoV1_MERS[i] %in% CoV2_MERS){
-    All = c(All, CoV1_MERS[i])
-  }
-}
-
-rm(i)
+CoV2_abundance <- read.xlsx("SARS-CoV-2 UN_48H\\Data and figures\\CoV2_UN_48_filtered.xlsx",1)
+CoV1_abundance <- read.xlsx("SARS-CoV-1 UN_48H\\Data and figures\\CoV1_UN_48_filtered.xlsx",1)
+MERS_abundance <- read.xlsx("MERS-CoV UN_24H\\Data and figures\\MERS_UN_24_filtered.xlsx",1)
 
 ```
 
-#### Data.frames with info about common pathways from the different viruses
+
+## Matrix with logFC values
 
 ```{r}
-CoV2_common <- data.frame(Term = c(), Overlap = c(), Adjusted.P.value = c(), Genes = c())
-CoV1_common <- data.frame(Term = c(), Overlap = c(), Adjusted.P.value = c(), Genes = c())
-MERS_common <- data.frame(Term = c(), Overlap = c(), Adjusted.P.value = c(), Genes = c())
 
+data <- data.frame(Genes = genes, CoV2 = rep(NA, length(genes)), CoV1 = rep(NA, length(genes)), MERS = rep(NA, length(genes)))
 
-for (i in match(All, CoV2$Term)){
-  C2 <- data.frame(Term = CoV2$Term[i], Overlap = CoV2$Overlap[i], Adjusted.P.value = CoV2$Adjusted.P.value[i], Genes = CoV2$Genes[i])
-  CoV2_common <- rbind(CoV2_common, C2)
+for (i in 1:length(genes)){
   
+  #Go through CoV2
+  for (l in 1:nrow(CoV2_abundance)){
+    if (CoV2_abundance$adj.P.Val[l] < 0.05 & genes[i] == CoV2_abundance$Gene_name[l]){
+      data$CoV2[i] <- CoV2_abundance$logFC[l]
+    }
+  }
 }
-
-for (i in match(All, CoV1$Term)){
-  C1 <- data.frame(Term = CoV1$Term[i], Overlap = CoV1$Overlap[i], Adjusted.P.value = CoV1$Adjusted.P.value[i], Genes = CoV1$Genes[i])
-  CoV1_common <- rbind(CoV1_common, C1)
-  
-}
-for (i in match(All, MERS$Term)){
-  CM <- data.frame(Term = MERS$Term[i], Overlap = MERS$Overlap[i], Adjusted.P.value = MERS$Adjusted.P.value[i], Genes = MERS$Genes[i])
-  MERS_common <- rbind(MERS_common, CM)
-  
-}
-
-#To make it the right order for ggplot
-
-CoV2_common$position <- "SARS-CoV-2"
-CoV2$Term <- factor(CoV2$Term, levels = CoV2$Term )
-
-CoV1_common$position <- "SARS-CoV-1"
-CoV1$Term <- factor(CoV1$Term, levels = CoV1$Term )
-
-MERS_common$position <- "MERS-CoV"
-MERS$Term <- factor(MERS$Term, levels = MERS$Term )
-
-
-rm(C2)
-rm(C1)
-rm(CM)
 ```
 
-### Dot plot
 
+
+
+### Heatmap
 ```{r}
-plot <- rbind(CoV2_common, CoV1_common, MERS_common)
-plot$position <- factor(plot$position, levels = c("SARS-CoV-2", "SARS-CoV-1", "MERS-CoV"))
+library(ComplexHeatmap)
 
-pdf("Common_pathways_enrichr_Reactome_2016_dot.pdf", width = 13, height = 18)
-
-p<-ggplot(plot, aes(x = position, y = Term)) + geom_point(aes(size = Overlap, color = Adjusted.P.value)) + scale_color_gradientn(colors = c("#668466", "#CC0000")) + theme_classic() + theme(axis.title.x=element_blank(), axis.ticks.x=element_blank()) 
-
-p
-
+pdf("Heatmat_neogi_covid_interferon_2.pdf", width = 10, height = 18)
+ht = Heatmap(as.matrix(input[,-c(1, 4, 11:17)]),
+             col = col_fun1,
+             show_row_names = TRUE,
+             column_order = colnames(input)[-c(1, 4, 11:17)],
+             show_column_names = FALSE,
+             column_split = condition[-3],
+             row_split = input$Pathway,row_title_rot = 0,
+             column_title_gp = gpar(fill = c(c_t0, c_t24, c_t48, c_t72)),
+             border = FALSE,
+             column_gap = unit(2, "mm"), 
+             right_annotation = rowAnnotation(Mock_H24 = input$LogFC_0_24,
+                                              Mock_H48 = input$LogFC_0_48,
+                                              H24_H48 = input$LogFC_24_48,
+                                              
+                                              col = list(
+                                                         Mock_H24 = col_fun_2,
+                                                         Mock_H48 = col_fun_2,
+                                                         H24_H48 = col_fun_2
+                                                         ),  show_legend = TRUE, gp = gpar(col = "grey")
+             ))
+#hm = Heatmap(as.matrix(input[,c(15:17)]), col = col_fun, cluster_rows = FALSE, cluster_columns = FALSE , column_names_rot = 0, column_names_side = "top")
+ht_list = ht
+draw(ht_list)
 dev.off()
-
-rm(p)
-rm(plot)
-
 ```
 
+
+
+
+---

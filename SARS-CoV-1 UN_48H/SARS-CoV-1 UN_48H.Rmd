@@ -5,9 +5,10 @@ output: html_notebook
 
 ## Setup environment 
 
-### Clean environment
-```{r}
+### Clean environment and set directory
+```{r setup}
 rm(list=ls())
+knitr::opts_knit$set(root.dir = normalizePath("C:\\Users\\beasav\\OneDrive - KI.SE\\Bioinformatics\\Thesis\\SARS-CoV-1 UN_48H\\Data and figures"))
 
 ```
 
@@ -19,41 +20,50 @@ library(clusterProfiler)
 library(org.Hs.eg.db)
 ```
 
-### set directory
-```{r setup}
-knitr::opts_knit$set(root.dir = normalizePath("C:\\Users\\beasav\\OneDrive - KI.SE\\Bioinformatics\\Thesis\\SARS-CoV-1 UN_48H\\Data and figures")) 
-```
-
 ## Load data
 SARS-CoV-1 UN48_48
 ```{r}
-data <- read.xlsx("SARS_UN48_vs_SA48_DGE_results.xlsx",1)
+data_raw <- read.xlsx("SARS_UN48_vs_SA48_DGE_results.xlsx",1)
 
 ```
 
-### Filter significantly regulted genes
+### Filter for important info and significance
 
 ```{r}
-data$Significance <- NA #create a Color column
+
+data <- data.frame(Gene_name = rep(NA, nrow(data_raw)), logFC = rep(NA, nrow(data_raw)), adj.P.Val = rep(NA, nrow(data_raw)), Significance = rep(NA, nrow(data_raw)))
+#create a Color column
+
+data$Gene_name <- data_raw$Gene_name
+data$logFC <- data_raw$logFC
+data$adj.P.Val <- data_raw$adj.P.Val
+
+rm(data_raw)
 
 for (i in 1:nrow(data)){
-  if(data[i, 4] > 0.3 & data[i, 8] < 0.05){
-    data[i, 10] <- "up_regulated"
+  if(data$logFC[i] > 0.3 & data$adj.P.Val[i] < 0.05){
+    data$Significance[i] <- "up_regulated"
   }
-  else if(data[i, 4] < -0.3 & data[i, 8] < 0.05){
-    data[i, 10] <- "down_regulated"
+  else if(data$logFC[i] < -0.3 & data$adj.P.Val[i] < 0.05){
+    data$Significance[i] <- "down_regulated"
   }
-  else if(data[i, 8] > 0.05){
-    data[i, 10] <- "NS" #Non significant
+  else if(data$adj.P.Val[i] > 0.05){
+    data$Significance[i] <- "NS" #Non significant
     #data[i, 3] <- NA #Delete gene name for NS - So that it doesn't appear in the figure?
   }
   else{ #Label remaining significant genes
-    data[i,10] <- "significant"
+    data$Significance[i] <- "significant"
     #data[i, 3] <- NA #Delete gene name for significant - So that it doesn't appear in the figure?
   }
     
 }
+
 rm(i)
+```
+
+### Save in file
+```{r}
+write.xlsx(data, "CoV1_UN_48_filtered.xlsx", row.names = FALSE)
 ```
 
 
@@ -65,11 +75,11 @@ rm(i)
 data_vol <- data
 
 for (i in 1:nrow(data_vol)){
-  if(data_vol[i, 10] == "NS"){
-    data_vol[i, 3] <- NA #Delete gene name for NS - So that it doesn't appear in the figure?
+  if(data_vol$Significance[i] == "NS"){
+    data_vol$Gene_name[i] <- NA #Delete gene name for NS - So that it doesn't appear in the figure?
   }
-  else if(data_vol[i, 10] == "significant") { #Label remaining significant genes
-    data_vol[i, 3] <- NA #Delete gene name for significant - So that it doesn't appear in the figure?
+  else if(data_vol$Significance[i] == "significant") { #Label remaining significant genes
+    data_vol$Gene_name[i] <- NA #Delete gene name for significant - So that it doesn't appear in the figure?
   }
     
 }
@@ -91,14 +101,14 @@ pdf("volcano_plot.pdf", height = 5, width = 7)
 vol <- ggplot(data = data_vol, aes(x = logFC, y = -log10(adj.P.Val), colour = logFC)) + geom_point(size=1, alpha = 3, na.rm = T) + scale_color_gradientn(colors = c("#003300", "#325b32","#668466","#F2490C","#670000")) + theme(legend.title=element_text(size=10), legend.text=element_text(size=6),
         legend.key.size=unit(0.7,"line"), plot.title = element_text(hjust = 0.5),
         axis.title.y=element_text(size=10), axis.title.x=element_text(size=10),
-        axis.text.y=element_text(size=10), axis.text.x=element_text(size=10)) + labs(x="Log2 Fold Change", y="-log10 (adj.P.Val)") + geom_text_repel(aes(label = Gene_name), size=2.5, color = "black") + theme_light()
+        axis.text.y=element_text(size=10), axis.text.x=element_text(size=10)) + labs(x="Log2 Fold Change", y="-log10 (adj.P.Val)") + geom_text_repel(aes(label = Gene_name), size=2.5, color = "black") + theme_light() 
 
 vol
 
 dev.off()
 ```
 
-#### Add horizontal line for p<0.05 in volcano plot
+#### Add horizontal line for p<0.05 in volcano plot and vertival line for logFC <-0.3 and >0.3 in volcano plot
 
 ```{r}
 pdf("volcano_plot_line.pdf", height = 5, width = 7)
@@ -106,7 +116,7 @@ pdf("volcano_plot_line.pdf", height = 5, width = 7)
 vol <- ggplot(data = data_vol, aes(x = logFC, y = -log10(adj.P.Val), colour = logFC)) + geom_point(size=1, alpha = 3, na.rm = T) + scale_color_gradientn(colors = c("#003300", "#325b32","#668466","#F2490C","#670000")) + theme(legend.title=element_text(size=10), legend.text=element_text(size=6),
         legend.key.size=unit(0.7,"line"), plot.title = element_text(hjust = 0.5),
         axis.title.y=element_text(size=10), axis.title.x=element_text(size=10),
-        axis.text.y=element_text(size=10), axis.text.x=element_text(size=10)) + labs(x="Log2 Fold Change", y="-log10 (adj.P.Val)") + geom_text_repel(aes(label = Gene_name), size=2.5, color = "black") + theme_light() + geom_hline(yintercept= - log10(0.05), linetype="dashed")
+        axis.text.y=element_text(size=10), axis.text.x=element_text(size=10)) + labs(x="Log2 Fold Change", y="-log10 (adj.P.Val)") + geom_text_repel(aes(label = Gene_name), size=2.5, color = "black") + theme_light() + geom_hline(yintercept= - log10(0.05), linetype="dashed") + geom_vline(xintercept = 0.3, linetype="dashed") + geom_vline(xintercept = -0.3, linetype="dashed")
 
 vol
 
