@@ -40,12 +40,22 @@ data$adj.P.Val <- data_raw$adj.P.Val
 
 rm(data_raw)
 
+#Cont number of significant, upregulated and downregulated
+up <- 0
+down <- 0
+sig <- 0
+
 for (i in 1:nrow(data)){
   if(data$logFC[i] > 0.3 & data$adj.P.Val[i] < 0.05){
     data$Significance[i] <- "up_regulated"
+    
+    up <- up+1
+    
   }
   else if(data$logFC[i] < -0.3 & data$adj.P.Val[i] < 0.05){
     data$Significance[i] <- "down_regulated"
+    
+    down <- down + 1
   }
   else if(data$adj.P.Val[i] > 0.05){
     data$Significance[i] <- "NS" #Non significant
@@ -53,9 +63,13 @@ for (i in 1:nrow(data)){
   }
   else{ #Label remaining significant genes
     data$Significance[i] <- "significant"
+    
+    sig <- sig + 1
+    
     #data[i, 3] <- NA #Delete gene name for significant - So that it doesn't appear in the figure?
   }
 }
+
 rm(i)
 ```
 

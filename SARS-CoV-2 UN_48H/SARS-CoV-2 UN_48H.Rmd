@@ -45,12 +45,22 @@ data$adj.P.Val <- data_raw$adj.P.Val
 
 rm(data_raw)
 
+#Cont number of significant, upregulated and downregulated
+up <- 0
+down <- 0
+sig <- 0
+
 for (i in 1:nrow(data)){
   if(data$logFC[i] > 0.3 & data$adj.P.Val[i] < 0.05){
     data$Significance[i] <- "up_regulated"
+    
+    up <- up+1
+    
   }
   else if(data$logFC[i] < -0.3 & data$adj.P.Val[i] < 0.05){
     data$Significance[i] <- "down_regulated"
+    
+    down <- down + 1
   }
   else if(data$adj.P.Val[i] > 0.05){
     data$Significance[i] <- "NS" #Non significant
@@ -58,9 +68,13 @@ for (i in 1:nrow(data)){
   }
   else{ #Label remaining significant genes
     data$Significance[i] <- "significant"
+    
+    sig <- sig + 1
+    
     #data[i, 3] <- NA #Delete gene name for significant - So that it doesn't appear in the figure?
   }
 }
+
 rm(i)
 ```
 
@@ -225,7 +239,7 @@ for (i in 1:nrow(enrichr_sig)){
 
 ```
 
-### Select the top100 pathways
+### Select the top20 pathways
 According to Flora the p-value tells more than the overlap.
 
 enrichr dataset is ordered based on p-value
@@ -373,7 +387,7 @@ write.xlsx(enrichr, "Enrichr_KEGG_2021_sig.xlsx", sheetName = "Enrichr_sig", col
 ```
 
 
-### Select the top100 pathways
+### Select the top10 pathways
 According to Flora the p-value tells more than the overlap.
 
 enrichr dataset is ordered based on p-value
@@ -382,8 +396,8 @@ enrichr_top <- data.frame(Term = c(), Overlap = c(), Adjusted.P.value = c())
 
 
 # do top enrichr but with Interferon and pvalue < 0.05
-for ( i in 1:100) {
-  top_pathway <- data.frame(Term = enrichr$Term[i], Overlap = enrichr$Overlap[i], Adjusted.P.value = enrichrenrichr$Adjusted.P.value[i] )
+for ( i in 1:20) {
+  top_pathway <- data.frame(Term = enrichr$Term[i], Overlap = enrichr$Overlap[i], Adjusted.P.value = enrichr$Adjusted.P.value[i] )
     
   enrichr_top <- rbind(enrichr_top, top_pathway)
 }
@@ -413,13 +427,22 @@ dev.off()
 rm(p)
 
 ```
-#### Building top100 bar plot
+#### Building top20 bar plot
 
 ```{r}
 enrichr_top$Term <- factor(enrichr_top$Term, levels = enrichr_top$Term ) #To make it the right order for ggplot
 
-pdf("Comparison_pathways_enrichr_top100_bar.pdf", width = 18, height = 20)
-p<-ggplot(data = enrichr_top, aes(x = Term, y = Overlap)) + geom_bar(stat="identity", aes(fill = Adjusted.P.value)) + scale_fill_gradientn(colors = c("#668466", "#CC0000")) + coord_flip() + theme_light() + theme(axis.title.y=element_blank())
+pdf("Comparison_pathways_enrichr_top20_bar.pdf", width = 19, height = 20)
+p<-ggplot(data = enrichr_top, aes(x = Term, y = Overlap)) +
+  geom_bar(stat="identity", aes(fill = Adjusted.P.value)) + 
+  scale_fill_gradientn(colors = c("#668466", "#CC0000")) + 
+  coord_flip() + theme_light() + 
+  theme(axis.text=element_text(size=21),
+        axis.title=element_text(size=21),
+        axis.title.y=element_blank(), 
+        legend.key.size = unit(1.5, 'cm'), 
+        legend.title = element_text(size = 21),  
+        legend.text = element_text(size = 20))
 
 p
 

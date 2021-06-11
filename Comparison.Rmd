@@ -61,10 +61,10 @@ venn.diagram(
           lwd = 1,
           col=c('#70abb3', "#f37736", "#7bc043"),
           fill = c(alpha('#70abb3',0.3), alpha("#f37736",0.3), alpha("#7bc043",0.3)),
-          cex = 0.9,
+          cex = 1.5,
           fontfamily = "sans",
 
-          cat.cex = 1,
+          cat.cex = 1.5,
           cat.default.pos = "outer",
           cat.pos = c(-170, 170, 0),
           cat.dist = c(0.025, 0.025, 0.02),
@@ -156,9 +156,13 @@ rm(CM)
 plot <- rbind(CoV2_common, CoV1_common, MERS_common)
 plot$position <- factor(plot$position, levels = c("SARS-CoV-2", "SARS-CoV-1", "MERS-CoV"))
 
-pdf("Common_pathways_enrichr_KEGG_2021_dot.pdf", width = 7, height = 5)
+pdf("Common_pathways_enrichr_KEGG_2021_dot.pdf", width = 6, height = 3)
 
-p<-ggplot(plot, aes(x = position, y = Term)) + geom_point(aes(size = Overlap, color = Adjusted.P.value)) + scale_color_gradientn(colors = c("#668466", "#CC0000")) + theme_classic() + theme(axis.title.x=element_blank(), axis.ticks.x=element_blank()) 
+p<-ggplot(plot, aes(x = position, y = Term)) + 
+  geom_point(aes(size = Overlap, color = Adjusted.P.value)) + 
+  scale_color_gradientn(colors = c("#668466", "#CC0000")) + 
+  theme_classic() + 
+  theme(axis.title.y=element_blank(), axis.title.x=element_blank(), axis.ticks.x=element_blank(), legend.key.size = unit(0.3, 'cm'), legend.title = element_text(size = 8),  legend.text = element_text(size = 6)) 
 
 p
 
@@ -177,8 +181,8 @@ rm(plot)
 http://rest.kegg.jp/get/hsa05171
 
 ```{r}
-genes <- read.delim("KEGG_hsa05171_Coronavirus disease_genes.txt", header = FALSE)
-genes <- genes$V1
+genes <- read.xlsx("KEGG_hsa05171_Coronavirus disease_genes.xlsx", 1, header = TRUE)
+genes <- genes$Gene_name
 ```
 
 
@@ -196,7 +200,15 @@ MERS_abundance <- read.xlsx("MERS-CoV UN_24H\\Data and figures\\MERS_UN_24_filte
 
 ```{r}
 
-data <- data.frame(Genes = genes, CoV2 = rep(NA, length(genes)), CoV1 = rep(NA, length(genes)), MERS = rep(NA, length(genes)))
+data <- data.frame(CoV2 = rep(NaN, length(genes)), CoV1 = rep(NaN, length(genes)), MERS = rep(NaN, length(genes)))
+
+rownames(data) <- genes
+
+CoV2_genes <- c()
+CoV1_genes <- c()
+MERS_genes <- c()
+
+#row.names(data) <- genes
 
 for (i in 1:length(genes)){
   
@@ -204,46 +216,311 @@ for (i in 1:length(genes)){
   for (l in 1:nrow(CoV2_abundance)){
     if (CoV2_abundance$adj.P.Val[l] < 0.05 & genes[i] == CoV2_abundance$Gene_name[l]){
       data$CoV2[i] <- CoV2_abundance$logFC[l]
+      
+      CoV2_genes <- c(CoV2_genes, genes[i])
+      
+    }
+  }
+  
+  #Go through CoV1
+  for (l in 1:nrow(CoV1_abundance)){
+    if (CoV1_abundance$adj.P.Val[l] < 0.05 & genes[i] == CoV1_abundance$Gene_name[l]){
+      data$CoV1[i] <- CoV1_abundance$logFC[l]
+      
+      CoV1_genes <- c(CoV1_genes, genes[i])
+    }
+  }
+  
+  #Go through MERS
+  for (l in 1:nrow(MERS_abundance)){
+    if (MERS_abundance$adj.P.Val[l] < 0.05 & genes[i] == MERS_abundance$Gene_name[l]){
+      data$MERS[i] <- MERS_abundance$logFC[l]
+      
+      MERS_genes <- c(MERS_genes, genes[i])
+    }
+  }
+  
+}
+
+#data[is.na(data)] <- 0
+
+rm(i)
+rm(l)
+```
+
+### Write genes from this pathway in files for STRING
+
+```{r}
+write(CoV2_genes, "STRING\\CoV2_genes.txt")
+write(CoV1_genes, "STRING\\CoV1_genes.txt")
+write(MERS_genes, "STRING\\MERS_genes.txt")
+```
+
+
+### Heatmap_All
+
+```{r}
+library("gplots")
+
+pdf("Heatmat_coronavirus disease_all.pdf", width = 6, height = 20)
+
+heatmap.2(as.matrix(data), Rowv = FALSE,
+          Colv = FALSE,
+          dendrogram = "none",
+          tracecol=NA,
+          na.color = "#E0E0E0",
+          scale = "none",
+          col = colorRampPalette(c("#003300", "#325b32","white", "#F2490C", "#670000")),
+          
+          #Axis labels
+          cexRow = 0.1,
+          cexCol = 1.1,
+          srtCol = 45,
+          labCol = c("SARS-CoV-2", "SARS-CoV-1", "MERS-CoV"),
+          
+          
+          # color key + density info
+          #key = TRUE,
+          #keysize = 5,
+          density.info="none",
+          #denscol=tracecol,
+          #symkey = any(x < 0, na.rm=TRUE) || symbreaks,
+          #densadj = 0.25,
+          key.title = NA,
+          key.xlab = NA, #"logFC",
+          #key.ylab = NULL,
+          #key.xtickfun = NULL,
+          #key.ytickfun = NULL,
+          #key.par = list(mar=c(10,10,3,0)),
+          
+          
+          # plot layout
+          #lmat = 1,
+          lhei = c(0.5, 10),
+          lwid = c(3, 5),
+          margins=c(6,9)
+)
+
+dev.off()
+
+```
+### Heatmap_All_nolabel
+
+```{r}
+library("gplots")
+
+pdf("Heatmat_coronavirus disease_all_nobels.pdf", width = 6, height = 20)
+
+heatmap.2(as.matrix(data), Rowv = FALSE,
+          Colv = FALSE,
+          dendrogram = "none",
+          tracecol=NA,
+          na.color = "#E0E0E0",
+          scale = "none",
+          col = colorRampPalette(c("#003300", "#325b32","white", "#F2490C", "#670000")),
+          
+          #Axis labels
+          #cexRow = 0.1,
+          labRow = NA,
+          cexCol = 1.1,
+          srtCol = 45,
+          labCol = c("SARS-CoV-2", "SARS-CoV-1", "MERS-CoV"),
+          
+          
+          # color key + density info
+          #key = TRUE,
+          #keysize = 5,
+          density.info="none",
+          #denscol=tracecol,
+          #symkey = any(x < 0, na.rm=TRUE) || symbreaks,
+          #densadj = 0.25,
+          key.title = NA,
+          key.xlab = NA, #"logFC",
+          #key.ylab = NULL,
+          #key.xtickfun = NULL,
+          #key.ytickfun = NULL,
+          #key.par = list(mar=c(10,10,3,0)),
+          
+          
+          # plot layout
+          #lmat = 1,
+          lhei = c(0.5, 10),
+          lwid = c(3, 5),
+          margins=c(6,9)
+)
+
+dev.off()
+
+```
+### Heatmap with only differentially regulated in at least one of the viruses
+#### Clean NA rows
+```{r}
+
+data_clean <- data.frame(CoV2 = c(), CoV1 = c(), MERS = c())
+
+genes_clean <- c()
+
+for (i in 1:nrow(data))
+  if (!(is.na(data$CoV2[i]) & is.na(data$CoV1[i]) & is.na(data$MERS[i]))){
+    genes_clean <- c(genes_clean, genes[i])
+    d <- data.frame(CoV2 = data$CoV2[i], CoV1 = data$CoV1[i], MERS = data$MERS[i])
+    data_clean <- rbind(data_clean, d)
+  }
+
+rownames(data_clean) <- genes_clean
+
+rm(d)
+rm(i)
+rm(genes_clean)
+
+```
+
+#### Heatmap clean data_key_nolabel
+```{r}
+library("gplots")
+
+pdf("Heatmat_coronavirus disease_clean_key_nolabel.pdf", width = 5, height = 8)
+
+heatmap.2(as.matrix(data_clean),
+          Rowv = FALSE,
+          Colv = FALSE,
+          dendrogram = "none",
+          tracecol=NA,
+          na.color = "#E0E0E0",
+          scale = "none",
+          col = colorRampPalette(c("#003300", "#325b32","white", "#F2490C", "#670000")),
+          
+          #Axis labels
+          #cexRow = 1,
+          labRow = NA,
+          cexCol = 1.2,
+          srtCol = 45,
+          labCol = c("SARS-CoV-2", "SARS-CoV-1", "MERS-CoV"),
+          
+          
+          # color key + density info
+          key = TRUE,
+          #keysize = 5,
+          density.info="none",
+          #denscol=tracecol,
+          #symkey = any(x < 0, na.rm=TRUE) || symbreaks,
+          #densadj = 0.25,
+          key.title = NA,
+          key.xlab = NA, #"logFC",
+          #key.ylab = NULL,
+          #key.xtickfun = NULL,
+          #key.ytickfun = NULL,
+          key.par = list(mar=c(2,0.5,0.5,0.5)), #bottom,left,top,right
+          
+          
+          # plot layout
+          #lmat = 1,
+          lhei = c(1, 13),
+          lwid = c(2, 5),
+          margins=c(6,0.5)
+)
+
+dev.off()
+```
+#### Heatmap clean data_nolabel
+```{r}
+library("gplots")
+
+pdf("Heatmat_coronavirus disease_clean_nolabel.pdf", width = 3, height = 5)
+
+heatmap.2(as.matrix(data_clean),
+          Rowv = FALSE,
+          Colv = FALSE,
+          dendrogram = "none",
+          tracecol = NA,
+          na.color = "#E0E0E0",
+          scale = "none",
+          col = colorRampPalette(c("#003300", "#325b32","white", "#F2490C", "#670000")),
+          
+          #Axis labels
+          #cexRow = 1,
+          labRow = NA,
+          cexCol = 1,
+          srtCol = 45,
+          labCol = c("SARS-CoV-2", "SARS-CoV-1", "MERS-CoV"),
+          
+          
+          # color key + density info
+          key = FALSE,
+          #keysize = 5,
+          #density.info="none",
+          #denscol=tracecol,
+          #symkey = any(x < 0, na.rm=TRUE) || symbreaks,
+          #densadj = 0.25,
+          #key.title = NA,
+          #key.xlab = NA, #"logFC",
+          #key.ylab = NULL,
+          #key.xtickfun = NULL,
+          #key.ytickfun = NULL,
+          #key.par = list(mar=c(2,0.5,0.5,0.5)), #bottom,left,top,right
+          
+          
+          # plot layout
+          #lmat = 1,
+          lhei = c(0.1, 13),
+          lwid = c(1, 7),
+          margins=c(5,0.5)
+)
+
+dev.off()
+```
+---
+# Cytoscape
+
+## Get cytoscape tables
+```{r}
+
+CoV2_cytoscape <- read.xlsx("STRING\\CoV2_cytoscape_table_filtered.xlsx",1)
+
+CoV1_cytoscape <- read.xlsx("STRING\\CoV1_cytoscape_table_filtered.xlsx",1)
+
+MERS_cytoscape <- read.xlsx("STRING\\MERS_cytoscape_table_filtered.xlsx",1)
+
+
+```
+
+
+## Fill cytoscape tables
+```{r}
+for (i in 1:nrow(CoV2_cytoscape)){
+  for (l in 1:nrow(CoV2_abundance)){
+    if (CoV2_cytoscape$display.name[i] == CoV2_abundance$Gene_name[l]){
+      CoV2_cytoscape$adj.P.Val[i] <- CoV2_abundance$adj.P.Val[l]
+      CoV2_cytoscape$logFC[i] <- CoV2_abundance$logFC[l]
     }
   }
 }
+
+for (i in 1:nrow(CoV1_cytoscape)){
+  for (l in 1:nrow(CoV1_abundance)){
+    if (CoV1_cytoscape$display.name[i] == CoV1_abundance$Gene_name[l]){
+      CoV1_cytoscape$adj.P.Val[i] <- CoV1_abundance$adj.P.Val[l]
+      CoV1_cytoscape$logFC[i] <- CoV1_abundance$logFC[l]
+    }
+  }
+}
+
+for (i in 1:nrow(MERS_cytoscape)){
+  for (l in 1:nrow(MERS_abundance)){
+    if (MERS_cytoscape$display.name[i] == MERS_abundance$Gene_name[l]){
+      MERS_cytoscape$adj.P.Val[i] <- MERS_abundance$adj.P.Val[l]
+      MERS_cytoscape$logFC[i] <- MERS_abundance$logFC[l]
+    }
+  }
+}
+
 ```
 
-
-
-
-### Heatmap
+## write in file
 ```{r}
-library(ComplexHeatmap)
 
-pdf("Heatmat_neogi_covid_interferon_2.pdf", width = 10, height = 18)
-ht = Heatmap(as.matrix(input[,-c(1, 4, 11:17)]),
-             col = col_fun1,
-             show_row_names = TRUE,
-             column_order = colnames(input)[-c(1, 4, 11:17)],
-             show_column_names = FALSE,
-             column_split = condition[-3],
-             row_split = input$Pathway,row_title_rot = 0,
-             column_title_gp = gpar(fill = c(c_t0, c_t24, c_t48, c_t72)),
-             border = FALSE,
-             column_gap = unit(2, "mm"), 
-             right_annotation = rowAnnotation(Mock_H24 = input$LogFC_0_24,
-                                              Mock_H48 = input$LogFC_0_48,
-                                              H24_H48 = input$LogFC_24_48,
-                                              
-                                              col = list(
-                                                         Mock_H24 = col_fun_2,
-                                                         Mock_H48 = col_fun_2,
-                                                         H24_H48 = col_fun_2
-                                                         ),  show_legend = TRUE, gp = gpar(col = "grey")
-             ))
-#hm = Heatmap(as.matrix(input[,c(15:17)]), col = col_fun, cluster_rows = FALSE, cluster_columns = FALSE , column_names_rot = 0, column_names_side = "top")
-ht_list = ht
-draw(ht_list)
-dev.off()
+write.xlsx(CoV2_cytoscape, "STRING\\CoV2_cytoscape_table.xlsx", col.names = TRUE, row.names = FALSE)
+write.xlsx(CoV1_cytoscape, "STRING\\CoV1_cytoscape_table.xlsx", col.names = TRUE, row.names = FALSE)
+write.xlsx(MERS_cytoscape, "STRING\\MERS_cytoscape_table.xlsx", col.names = TRUE, row.names = FALSE)
 ```
 
-
-
-
----
